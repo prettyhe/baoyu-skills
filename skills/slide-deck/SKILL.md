@@ -1,11 +1,11 @@
 ---
 name: slide-deck
-description: Generate professional slide deck outlines from content. Creates comprehensive, designer-ready outlines with style instructions, narrative structure, and detailed slide specifications. Use when user asks to "create slides", "make a presentation", "generate deck", or "slide deck outline".
+description: Generate professional slide deck images from content. Creates comprehensive outlines with style instructions, then generates individual slide images. Use when user asks to "create slides", "make a presentation", "generate deck", or "slide deck".
 ---
 
-# Slide Deck Outline Generator
+# Slide Deck Generator
 
-Transform content into professional, designer-ready slide deck outlines with comprehensive style instructions and narrative structure.
+Transform content into professional slide deck with comprehensive outlines and generated slide images.
 
 ## Usage
 
@@ -26,6 +26,9 @@ Transform content into professional, designer-ready slide deck outlines with com
 /slide-deck path/to/article.md --lang zh
 /slide-deck path/to/article.md --lang en
 
+# Outline only (no image generation)
+/slide-deck path/to/article.md --outline-only
+
 # Direct content input
 /slide-deck
 [paste content]
@@ -39,31 +42,32 @@ Transform content into professional, designer-ready slide deck outlines with com
 | `--audience <type>` | Target audience level |
 | `--lang <code>` | Output language (en, zh, etc.) |
 | `--slides <number>` | Target slide count (max 20) |
+| `--outline-only` | Generate outline only, skip image generation |
 
 ## Style Gallery
 
 ### 1. `editorial` (Default)
 Clean, sophisticated, minimalist
 - **Aesthetic**: High-end journal, architectural blueprints
-- **Colors**: Off-white background, dark slate text, blue accents
+- **Colors**: Off-white background (#F8F7F5), dark slate text (#2F3542), blue accents (#007AFF)
 - **Best for**: Thought leadership, research presentations
 
 ### 2. `corporate`
 Professional, trustworthy, polished
 - **Aesthetic**: Clean lines, structured layouts, business-appropriate
-- **Colors**: Navy, white, subtle gold accents
+- **Colors**: Navy (#1E3A5F), white, gold accents (#C9A227)
 - **Best for**: Business presentations, investor decks, reports
 
 ### 3. `technical`
 Precise, data-driven, analytical
 - **Aesthetic**: Blueprint style, schematic diagrams, grid layouts
-- **Colors**: Dark backgrounds, cyan/green accents, monospace elements
+- **Colors**: Dark charcoal (#1A1A2E), cyan accents (#00D4FF), light gray text (#E8E8E8)
 - **Best for**: Technical documentation, engineering presentations
 
 ### 4. `playful`
 Bold, energetic, engaging
 - **Aesthetic**: Dynamic shapes, vibrant colors, creative layouts
-- **Colors**: Bright primaries, gradients, contrasting pops
+- **Colors**: Warm white (#FFFDF7), deep purple (#4A1D96), coral (#FF6B6B)
 - **Best for**: Creative pitches, educational content, workshops
 
 ### 5. `minimal`
@@ -75,7 +79,7 @@ Ultra-clean, zen-like, focused
 ### 6. `storytelling`
 Narrative-driven, cinematic, immersive
 - **Aesthetic**: Full-bleed imagery, dramatic typography, chapter-like flow
-- **Colors**: Rich, moody palettes with high contrast
+- **Colors**: Rich charcoal (#2D2D2D), warm white (#FAF9F6), gold (#D4AF37)
 - **Best for**: Case studies, journey narratives, brand stories
 
 ## Audience Presets
@@ -90,37 +94,75 @@ Narrative-driven, cinematic, immersive
 
 ## File Management
 
-Save output to same directory as source:
+### With Article Path
 
 ```
 path/to/
 ├── article.md
 └── slide-deck/
-    └── outline.md
+    ├── outline.md
+    ├── prompts/
+    │   ├── 01-cover.md
+    │   ├── 02-content-1.md
+    │   └── ...
+    ├── 01-cover.png
+    ├── 02-content-1.png
+    └── ...
 ```
 
-Or to current directory if no source path:
+### Without Article Path
 
 ```
-./
-└── slide-deck-outline.md
+./slide-deck-outputs/YYYY-MM-DD/[topic-slug]/
+├── outline.md
+├── prompts/
+│   ├── 01-cover.md
+│   └── ...
+├── 01-cover.png
+└── ...
 ```
 
 ## Workflow
 
-### Step 1: Analyze Content
+### Step 1: Analyze Content & Select Style
 
-Extract from source material:
-- Core narrative and key messages
-- Important data points and statistics
-- Logical flow and structure
-- Target audience signals
+1. Read source content
+2. If `--style` specified, use that style
+3. Otherwise, analyze content for style signals:
 
-### Step 2: Generate Style Instructions
+| Content Signals | Selected Style |
+|----------------|----------------|
+| AI, coding, tech, digital, algorithm, data | `technical` |
+| Business, strategy, investment, corporate | `corporate` |
+| Personal story, journey, narrative, emotion | `storytelling` |
+| Simple, zen, focus, essential, one idea | `minimal` |
+| Fun, creative, workshop, educational | `playful` |
+| Research, analysis, thought leadership | `editorial` |
 
-Create a global `STYLE_INSTRUCTIONS` block based on content topic:
+4. Extract key information:
+   - Core narrative and key messages
+   - Important data points and statistics
+   - Logical flow and structure
+   - Target audience signals
+
+### Step 2: Generate Outline
+
+Create outline with `STYLE_INSTRUCTIONS` block and slide specifications.
+
+**Outline Format**:
 
 ```markdown
+# Slide Deck Outline: [Topic]
+
+**Source**: [source file or "Direct input"]
+**Style**: [selected style]
+**Audience**: [target audience]
+**Language**: [output language]
+**Slide Count**: N slides
+**Generated**: YYYY-MM-DD HH:mm
+
+---
+
 <STYLE_INSTRUCTIONS>
 Design Aesthetic: [Overall style description]
 Background Color: [Description and Hex Code]
@@ -131,14 +173,13 @@ Color Palette:
   Primary Accent Color: [Hex Code]
 Visual Elements: [Lines, shapes, imagery style, etc.]
 </STYLE_INSTRUCTIONS>
-```
 
-### Step 3: Create Slide Outline
+---
 
-Structure each slide with 4 required sections:
+## Slide 1: [Descriptive Title]
 
-```markdown
-## Slide N: [Descriptive Title]
+**Position**: Cover
+**Filename**: 01-cover.png
 
 // NARRATIVE GOAL
 [Storytelling purpose within the overall arc]
@@ -149,51 +190,98 @@ Sub-headline: [Supporting context]
 Body:
 - [Key point 1 with specific data from source]
 - [Key point 2 with specific data from source]
-- [Key point 3 with specific data from source]
 
 // VISUAL
 [Detailed description of imagery, charts, graphics, or abstract visuals]
 
 // LAYOUT
 [Composition, hierarchy, spatial arrangement, focus points]
+
+---
+
+## Slide 2: [First Content]
+...
+
+## Slide N: [Back Cover]
+...
 ```
 
-### Step 4: Ensure Structure
-
-Required slide structure:
+**Required Slide Structure**:
 1. **Slide 1**: Cover Slide (poster-style, heroic typography)
 2. **Slides 2-N-1**: Content slides (consistent internal style)
 3. **Slide N**: Back Cover (closing statement, not "Thank You")
 
-### Step 5: Output Complete Outline
+### Step 3: Save Outline
+
+Save outline as `outline.md` in target directory.
+
+If `--outline-only` flag is set, stop here.
+
+### Step 4: Create Prompt Files
+
+For each slide, create a style-specific prompt file.
+
+**Prompt Format**:
 
 ```markdown
-# Slide Deck Outline: [Topic]
+Slide theme: [slide title]
+Style: [style name]
+Position: [cover/content/back-cover]
 
-**Source**: [source file or "Direct input"]
-**Style**: [selected style]
-**Audience**: [target audience]
-**Language**: [output language]
-**Slide Count**: [N slides]
+Visual composition:
+- Main visual: [style-appropriate description from VISUAL section]
+- Layout: [from LAYOUT section]
+- Decorative elements: [style-specific decorations]
 
----
+Color scheme:
+- Background: [style background color]
+- Primary text: [style text color]
+- Accent: [style accent color]
 
-<STYLE_INSTRUCTIONS>
-[Complete style block]
-</STYLE_INSTRUCTIONS>
+Text content:
+- Headline: [headline text]
+- Sub-headline: [sub-headline if any]
+- Body points: [bullet points if any]
 
----
+Style notes: [specific style characteristics to emphasize]
+```
 
-## Slide 1: [Cover]
-[4 sections]
+### Step 5: Generate Images
 
-## Slide 2: [First Content]
-[4 sections]
+For each slide, generate using:
 
-...
+```bash
+/gemini-web --promptfiles [SKILL_ROOT]/skills/slide-deck/prompts/system.md [TARGET_DIR]/prompts/01-cover.md --image [TARGET_DIR]/01-cover.png
+```
 
-## Slide N: [Back Cover]
-[4 sections]
+Generation flow:
+1. Generate images sequentially
+2. After each image, output progress: "Generated X/N"
+3. On failure, auto-retry once
+4. If retry fails, log reason, continue to next
+
+### Step 6: Completion Report
+
+```
+Slide Deck Generated!
+
+Topic: [topic]
+Style: [style name]
+Audience: [audience]
+Location: [directory path]
+Slides: N total
+
+- 01-cover.png ✓ Cover
+- 02-content-1.png ✓ Content
+- 03-content-2.png ✓ Content
+- ...
+- 0N-back-cover.png ✓ Back Cover
+
+Outline: outline.md
+
+[If any failures]
+Failed:
+- 0X-slide-name.png: [failure reason]
 ```
 
 ## Style Reference Details
@@ -264,75 +352,32 @@ Primary Accent Color: Warm gold #D4AF37
 Visual Elements: Full-bleed photos, dramatic typography, chapter markers, emotional imagery
 ```
 
-## Output Example
-
-```markdown
-# Slide Deck Outline: AI Agent Automation Guide
-
-**Source**: use-agents-guide/article.md
-**Style**: technical
-**Audience**: intermediate
-**Language**: English
-**Slide Count**: 12 slides
-
----
-
-<STYLE_INSTRUCTIONS>
-Design Aesthetic: Blueprint-style technical presentation with analytical precision
-Background Color: Dark charcoal #1A1A2E
-Primary Font: JetBrains Mono
-Secondary Font: IBM Plex Sans
-Primary Text Color: #E8E8E8
-Primary Accent Color: #00D4FF
-Visual Elements: Grid overlays, data visualizations, schematic diagrams
-</STYLE_INSTRUCTIONS>
-
----
-
-## Slide 1: Cover
-
-// NARRATIVE GOAL
-Set the stage with a bold, attention-grabbing statement that frames the entire presentation's thesis.
-
-// KEY CONTENT
-Headline: "90% of your work should be agent-generated"
-Sub-headline: A practical guide to automation that actually works
-
-// VISUAL
-Abstract visualization of human-AI collaboration: a stylized figure working alongside flowing data streams and geometric AI representation.
-
-// LAYOUT
-Poster-style full-bleed. Headline dominates upper 60%, visual anchors bottom 40%. No clutter, pure impact.
-
----
-
-## Slide 2: The Reality Check
-
-// NARRATIVE GOAL
-Ground the audience by acknowledging the hype while establishing credibility through real experience.
-
-// KEY CONTENT
-Headline: Eight months of daily agent use revealed what works and what doesn't
-Body:
-- 8 months of Claude Code for writing, not just coding
-- Hundreds of hours of experimentation
-- Focus on non-engineering tasks: blog posts, grant proposals, meta reviews
-
-// VISUAL
-Timeline graphic showing the journey from experimentation to practical insights, with key milestones marked.
-
-// LAYOUT
-Left third: timeline visual. Right two-thirds: key points with subtle data callouts.
-
-...
-```
-
 ## Notes
 
+### Design Philosophy
+- Deck is designed for **reading and sharing**, not live presentation
+- Structure should be self-explanatory without a presenter
+- Include enough context for visuals to be understood standalone
+- Err on the side of audience having **more expertise** than expected
+
+### Content Rules
 - Maximum 20 slides per deck
 - Every data point must trace to source material
+- All details in prompts - image generator has no access to source
+
+### Style Rules
 - Avoid AI-generated clichés ("It wasn't just X, it was Y")
 - Use narrative headlines, not "Title: Subtitle" format
 - Cover and Back Cover should be visually distinct (poster-style)
 - Back Cover should be meaningful closure, not "Thank You" or "Questions?"
-- Designer will not have access to source - include all necessary details
+
+### Prohibited
+- Never include photorealistic images of prominent individuals
+- Never include placeholder slides for author name, date, etc.
+
+### Image Generation
+- Image generation typically takes 10-30 seconds per slide
+- Auto-retry once on generation failure
+- Use cartoon alternatives for sensitive public figures
+- Output language matches content language
+- Maintain style consistency across all slides
