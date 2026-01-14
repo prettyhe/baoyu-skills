@@ -16,7 +16,8 @@
       "strict": false,
       "skills": [
         "./skills/gemini-web",
-        "./skills/xhs-images"
+        "./skills/xhs-images",
+        "./skills/post-to-x"
       ]
     }
   ]
