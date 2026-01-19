@@ -31,13 +31,16 @@ npx add-skill jimliu/baoyu-skills
 
 1. 选择 **Browse and install plugins**
 2. 选择 **baoyu-skills**
-3. 选择 **content-skills**
+3. 选择要安装的插件
 4. 选择 **Install now**
 
 **方式二：直接安装**
 
 ```bash
+# 安装指定插件
 /plugin install content-skills@baoyu-skills
+/plugin install ai-generation-skills@baoyu-skills
+/plugin install utility-skills@baoyu-skills
 ```
 
 **方式三：告诉 Agent**
@@ -45,6 +48,14 @@ npx add-skill jimliu/baoyu-skills
 直接告诉 Claude Code：
 
 > 请帮我安装 github.com/JimLiu/baoyu-skills 中的 Skills
+
+### 可用插件
+
+| 插件 | 说明 | 包含技能 |
+|------|------|----------|
+| **content-skills** | 内容生成和发布 | [xhs-images](#baoyu-xhs-images), [cover-image](#baoyu-cover-image), [slide-deck](#baoyu-slide-deck), [comic](#baoyu-comic), [article-illustrator](#baoyu-article-illustrator), [post-to-x](#baoyu-post-to-x), [post-to-wechat](#baoyu-post-to-wechat) |
+| **ai-generation-skills** | AI 生成后端 | [danger-gemini-web](#baoyu-danger-gemini-web) |
+| **utility-skills** | 内容处理工具 | [danger-x-to-markdown](#baoyu-danger-x-to-markdown), [compress-image](#baoyu-compress-image) |
 
 ## 更新技能
 

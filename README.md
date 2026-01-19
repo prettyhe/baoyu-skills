@@ -31,13 +31,16 @@ Run the following command in Claude Code:
 
 1. Select **Browse and install plugins**
 2. Select **baoyu-skills**
-3. Select **content-skills**
+3. Select the plugin(s) you want to install
 4. Select **Install now**
 
 **Option 2: Direct Install**
 
 ```bash
+# Install specific plugin
 /plugin install content-skills@baoyu-skills
+/plugin install ai-generation-skills@baoyu-skills
+/plugin install utility-skills@baoyu-skills
 ```
 
 **Option 3: Ask the Agent**
@@ -45,6 +48,14 @@ Run the following command in Claude Code:
 Simply tell Claude Code:
 
 > Please install Skills from github.com/JimLiu/baoyu-skills
+
+### Available Plugins
+
+| Plugin | Description | Skills |
+|--------|-------------|--------|
+| **content-skills** | Content generation and publishing | [xhs-images](#baoyu-xhs-images), [cover-image](#baoyu-cover-image), [slide-deck](#baoyu-slide-deck), [comic](#baoyu-comic), [article-illustrator](#baoyu-article-illustrator), [post-to-x](#baoyu-post-to-x), [post-to-wechat](#baoyu-post-to-wechat) |
+| **ai-generation-skills** | AI-powered generation backends | [danger-gemini-web](#baoyu-danger-gemini-web) |
+| **utility-skills** | Utility tools for content processing | [danger-x-to-markdown](#baoyu-danger-x-to-markdown), [compress-image](#baoyu-compress-image) |
 
 ## Update Skills
 
