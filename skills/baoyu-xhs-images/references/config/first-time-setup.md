@@ -31,63 +31,37 @@ No EXTEND.md found
 
 ## Questions
 
+**Language**: Use user's input language or preferred language for all questions. Do not always use English.
+
 Use single AskUserQuestion with multiple questions (AskUserQuestion auto-adds "Other" option):
 
 ### Question 1: Watermark
 
 ```
 header: "Watermark"
-question: "Enable watermark on generated images?"
+question: "Watermark text for generated images? Type your watermark content (e.g., name, @handle)"
 options:
-  - label: "Enabled"
-    description: "Add watermark to all images"
-  - label: "Disabled"
-    description: "No watermark (can enable later)"
+  - label: "No watermark (Recommended)"
+    description: "No watermark, can enable later in EXTEND.md"
 ```
 
-### Question 2: Watermark Content (if enabled)
+Position defaults to bottom-right.
 
-```
-header: "Content"
-question: "What text for your watermark?"
-options:
-  - label: "@username"
-    description: "Your XHS handle (replace 'username')"
-  - label: "Custom text"
-    description: "Enter your own text"
-```
-
-### Question 3: Watermark Position (if enabled)
-
-```
-header: "Position"
-question: "Where to place watermark?"
-options:
-  - label: "bottom-right"
-    description: "Lower right corner (most common)"
-  - label: "bottom-left"
-    description: "Lower left corner"
-  - label: "bottom-center"
-    description: "Bottom center"
-  - label: "top-right"
-    description: "Upper right corner"
-```
-
-### Question 4: Preferred Style
+### Question 2: Preferred Style
 
 ```
 header: "Style"
-question: "Default visual style preference?"
+question: "Default visual style preference? Or type another style name or your custom style"
 options:
+  - label: "None (Recommended)"
+    description: "Auto-select based on content analysis"
   - label: "cute"
     description: "Sweet, adorable - classic XHS aesthetic"
   - label: "notion"
     description: "Minimalist hand-drawn, intellectual"
-  - label: "None"
-    description: "Auto-select based on content"
 ```
 
-### Question 5: Save Location
+### Question 3: Save Location
 
 ```
 header: "Save"
@@ -120,8 +94,8 @@ options:
 version: 1
 watermark:
   enabled: [true/false]
-  content: "[user input]"
-  position: [selected position]
+  content: "[user input or empty]"
+  position: bottom-right
   opacity: 0.7
 preferred_style:
   name: [selected style or null]
@@ -137,4 +111,4 @@ custom_styles: []
 Users can edit EXTEND.md directly or run setup again:
 - Delete EXTEND.md to trigger setup
 - Edit YAML frontmatter for quick changes
-- Full schema: `references/preferences-schema.md`
+- Full schema: `config/preferences-schema.md`

@@ -1,6 +1,6 @@
 ---
 name: baoyu-xhs-images
-description: Xiaohongshu (Little Red Book) infographic series generator with multiple style options. Breaks down content into 1-10 cartoon-style infographics. Use when user asks to create "小红书图片", "XHS images", or "RedNote infographics".
+description: Generates Xiaohongshu (Little Red Book) infographic series with 9 visual styles and 6 layouts. Breaks content into 1-10 cartoon-style images optimized for XHS engagement. Use when user mentions "小红书图片", "XHS images", "RedNote infographics", "小红书种草", or wants social media infographics for Chinese platforms.
 ---
 
 # Xiaohongshu Infographic Series Generator
@@ -61,7 +61,7 @@ Style × Layout can be freely combined. Example: `--style notion --layout dense`
 | `notion` | Minimalist hand-drawn line art, intellectual |
 | `chalkboard` | Colorful chalk on black board, educational |
 
-Detailed style definitions: `references/styles/<style>.md`
+Detailed style definitions: `references/presets/<style>.md`
 
 ## Layout Gallery
 
@@ -74,7 +74,7 @@ Detailed style definitions: `references/styles/<style>.md`
 | `comparison` | Side-by-side contrast layout |
 | `flow` | Process and timeline layout (3-6 steps) |
 
-Detailed layout definitions: `references/layouts/<layout>.md`
+Detailed layout definitions: `references/elements/canvas.md`
 
 ## Auto Selection
 
@@ -90,6 +90,37 @@ Detailed layout definitions: `references/layouts/<layout>.md`
 | Knowledge, concept, productivity, SaaS | `notion` | dense/list |
 | Education, tutorial, learning, teaching, classroom | `chalkboard` | balanced/dense |
 
+## Outline Strategies
+
+Three differentiated outline strategies for different content goals:
+
+### Strategy A: Story-Driven (故事驱动型)
+
+| Aspect | Description |
+|--------|-------------|
+| **Concept** | Personal experience as main thread, emotional resonance first |
+| **Features** | Start from pain point, show before/after change, strong authenticity |
+| **Best for** | Reviews, personal shares, transformation stories |
+| **Structure** | Hook → Problem → Discovery → Experience → Conclusion |
+
+### Strategy B: Information-Dense (信息密集型)
+
+| Aspect | Description |
+|--------|-------------|
+| **Concept** | Value-first, efficient information delivery |
+| **Features** | Clear structure, explicit points, professional credibility |
+| **Best for** | Tutorials, comparisons, product reviews, checklists |
+| **Structure** | Core conclusion → Info card → Pros/Cons → Recommendation |
+
+### Strategy C: Visual-First (视觉优先型)
+
+| Aspect | Description |
+|--------|-------------|
+| **Concept** | Visual impact as core, minimal text |
+| **Features** | Large images, atmospheric, instant appeal |
+| **Best for** | High-aesthetic products, lifestyle, mood-based content |
+| **Structure** | Hero image → Detail shots → Lifestyle scene → CTA |
+
 ## File Structure
 
 Each session creates an independent directory named by content slug:
@@ -97,11 +128,11 @@ Each session creates an independent directory named by content slug:
 ```
 xhs-images/{topic-slug}/
 ├── source-{slug}.{ext}             # Source files (text, images, etc.)
-├── analysis.md                     # Deep analysis results
-├── outline-style-[slug].md         # Variant A (e.g., outline-style-notion.md)
-├── outline-style-[slug].md         # Variant B (e.g., outline-style-notion.md)
-├── outline-style-[slug].md         # Variant C (e.g., outline-style-minimal.md)
-├── outline.md                      # Final selected
+├── analysis.md                     # Deep analysis + questions asked
+├── outline-strategy-a.md           # Strategy A: Story-driven
+├── outline-strategy-b.md           # Strategy B: Information-dense
+├── outline-strategy-c.md           # Strategy C: Visual-first
+├── outline.md                      # Final selected/merged outline
 ├── prompts/
 │   ├── 01-cover-[slug].md
 │   ├── 02-content-[slug].md
@@ -127,6 +158,27 @@ Copy all sources with naming `source-{slug}.{ext}`:
 
 ## Workflow
 
+### Progress Checklist
+
+Copy and track progress:
+
+```
+XHS Infographic Progress:
+- [ ] Step 0: Check preferences (EXTEND.md)
+- [ ] Step 1: Analyze content → analysis.md
+- [ ] Step 2: Confirmation 1 - Content understanding ⚠️ REQUIRED
+- [ ] Step 3: Generate 3 outline + style variants
+- [ ] Step 4: Confirmation 2 - Outline & style selection ⚠️ REQUIRED
+- [ ] Step 5: Generate images (sequential)
+- [ ] Step 6: Completion report
+```
+
+### Flow
+
+```
+Input → Analyze → [Confirm 1] → 3 Outlines → [Confirm 2: Outline + Style] → Generate → Complete
+```
+
 ### Step 0: Check Preferences
 
 **Check paths** (priority order):
@@ -146,11 +198,11 @@ Copy all sources with naming `source-{slug}.{ext}`:
 3. Continue to Step 1
 
 **If NO preferences found**:
-1. Ask user with AskUserQuestion (see `references/first-time-setup.md`)
+1. Ask user with AskUserQuestion (see `references/config/first-time-setup.md`)
 2. Create EXTEND.md with user choices
 3. Continue to Step 1
 
-Schema reference: `references/preferences-schema.md`
+Schema reference: `references/config/preferences-schema.md`
 
 ### Step 1: Analyze Content → `analysis.md`
 
@@ -161,7 +213,7 @@ Read source content, save it if needed, and perform deep analysis.
    - If user provides a file path: use as-is
    - If user pastes content: save to `source.md` in target directory
 2. Read source content
-3. **Deep analysis** following `references/analysis-framework.md`:
+3. **Deep analysis** following `references/workflows/analysis-framework.md`:
    - Content type classification (种草/干货/测评/教程/避坑...)
    - Hook analysis (爆款标题潜力)
    - Target audience identification
@@ -170,75 +222,101 @@ Read source content, save it if needed, and perform deep analysis.
    - Swipe flow design
 4. Detect source language
 5. Determine recommended image count (2-10)
-6. Select 3 style+layout combinations
+6. **Generate clarifying questions** (see Step 2)
 7. **Save to `analysis.md`**
 
-### Step 2: Generate 3 Outline Variants
+### Step 2: Confirmation 1 - Content Understanding ⚠️
 
-Based on analysis, create three distinct style variants.
+**Purpose**: Validate understanding + collect missing info. **Do NOT skip.**
 
-**For each variant**:
-1. **Generate outline** (`outline-style-[slug].md`):
-   - YAML front matter with style, layout, image_count
-   - Cover design with hook
-   - Each image: layout, core message, text content, visual concept
-   - **Written in user's preferred language**
-   - Reference: `references/outline-template.md`
+**Display summary**:
+- Content type + topic identified
+- Key points extracted
+- Tone detected
+- Source images count
 
-| Variant | Selection Logic | Example Filename |
-|---------|-----------------|------------------|
-| A | Primary recommendation | `outline-style-notion.md` |
-| B | Alternative style | `outline-style-notion.md` |
-| C | Different audience/mood | `outline-style-minimal.md` |
+**Use AskUserQuestion** for:
+1. Core selling point (multiSelect: true)
+2. Target audience
+3. Style preference: Authentic sharing / Professional review / Aesthetic mood / Auto
+4. Additional context (optional)
 
-**All variants are preserved after selection for reference.**
+**After response**: Update `analysis.md` → Step 3
 
-### Step 3: User Confirms All Options
+### Step 3: Generate 3 Outline + Style Variants
 
-**IMPORTANT**: Present ALL options in a single confirmation step using AskUserQuestion. Do NOT interrupt workflow with multiple separate confirmations.
+Based on analysis + user context, create three distinct strategy variants. Each variant includes both **outline structure** and **visual style recommendation**.
 
-**Prioritize user preferences** (from Step 0):
-- If user has `preferred_style`: Show as first option with "(Your preference)"
-- If user has `preferred_layout`: Show as first option with "(Your preference)"
+**For each strategy**:
 
-**Determine which questions to ask**:
+| Strategy | Filename | Outline | Recommended Style |
+|----------|----------|---------|-------------------|
+| A | `outline-strategy-a.md` | Story-driven: emotional, before/after | warm, cute, fresh |
+| B | `outline-strategy-b.md` | Information-dense: structured, factual | notion, minimal, chalkboard |
+| C | `outline-strategy-c.md` | Visual-first: atmospheric, minimal text | bold, pop, retro |
 
-| Question | When to Ask |
-|----------|-------------|
-| Style variant | Always (required) |
-| Default layout | Only if user might want to override |
-| Language | Only if `source_language ≠ user_language` |
+**Outline format** (YAML front matter + content):
+```yaml
+---
+strategy: a  # a, b, or c
+name: Story-Driven
+style: warm  # recommended style for this strategy
+style_reason: "Warm tones enhance emotional storytelling and personal connection"
+layout: balanced  # primary layout
+image_count: 5
+---
 
-**Language handling**:
-- If source language = user language: Just inform user (e.g., "Images will be in Chinese")
-- If different: Ask which language to use
+## P1 Cover
+**Type**: cover
+**Hook**: "入冬后脸不干了🥹终于找到对的面霜"
+**Visual**: Product hero shot with cozy winter atmosphere
+**Layout**: sparse
 
-**AskUserQuestion format**:
+## P2 Problem
+**Type**: pain-point
+**Message**: Previous struggles with dry skin
+**Visual**: Before state, relatable scenario
+**Layout**: balanced
 
-```
-Question 1 (Style): Which style variant?
-- User preference: notion + dense (Your preference) - 您的默认设置
-- A: notion + list - AI推荐: 清爽知识卡片
-- B: minimal + balanced - AI推荐: 简约高端风格
-- Custom: 自定义风格描述
-
-Question 2 (Layout) - only if relevant:
-- Your preference: dense (Your preference)
-- Keep variant default (Recommended)
-- sparse / balanced / list / comparison / flow
-
-Question 3 (Language) - only if mismatch:
-- 中文 (匹配原文)
-- English (your preference)
+...
 ```
 
-**After confirmation**:
-1. Copy selected `outline-style-[slug].md` → `outline.md`
-2. Update YAML front matter with confirmed options
-3. If custom style: regenerate outline with that style
-4. User may edit `outline.md` directly for fine-tuning
+**Differentiation requirements**:
+- Each strategy MUST have different outline structure AND different recommended style
+- Adapt page count: A typically 4-6, B typically 3-5, C typically 3-4
+- Include `style_reason` explaining why this style fits the strategy
+- Consider user's style preference from Step 2
 
-### Step 4: Generate Images
+Reference: `references/workflows/outline-template.md`
+
+### Step 4: Confirmation 2 - Outline & Style Selection ⚠️
+
+**Purpose**: User chooses outline strategy AND confirms visual style. **Do NOT skip.**
+
+**Display each strategy**:
+- Strategy name + page count + recommended style
+- Page-by-page summary (P1 → P2 → P3...)
+
+**Use AskUserQuestion** with two questions:
+
+**Question 1: Outline Strategy**
+- Strategy A (Recommended if "authentic sharing")
+- Strategy B (Recommended if "professional review")
+- Strategy C (Recommended if "aesthetic mood")
+- Combine: specify pages from each
+
+**Question 2: Visual Style**
+- Use strategy's recommended style (show which style)
+- Or select from: cute / fresh / warm / bold / minimal / retro / pop / notion / chalkboard
+- Or type custom style description
+
+**After response**:
+- Single strategy → copy to `outline.md` with confirmed style
+- Combination → merge specified pages with confirmed style
+- Custom request → regenerate based on feedback
+- Update `outline.md` frontmatter with final style choice
+
+### Step 5: Generate Images
 
 With confirmed outline + style + layout:
 
@@ -254,7 +332,7 @@ Include a subtle watermark "[content]" positioned at [position]
 with approximately [opacity*100]% visibility. The watermark should
 be legible but not distracting from the main content.
 ```
-Reference: `references/watermark-guide.md`
+Reference: `references/config/watermark-guide.md`
 
 **Image Generation Skill Selection**:
 - Check available image generation skills
@@ -266,22 +344,23 @@ If image generation skill supports `--sessionId`:
 2. Use same session ID for all images
 3. Ensures visual consistency across generated images
 
-### Step 5: Completion Report
+### Step 6: Completion Report
 
 ```
 Xiaohongshu Infographic Series Complete!
 
 Topic: [topic]
+Strategy: [A/B/C/Combined]
 Style: [style name]
 Layout: [layout name or "varies"]
 Location: [directory path]
 Images: N total
 
 ✓ analysis.md
-✓ outline-style-notion.md
-✓ outline-style-chalkboard.md
-✓ outline-style-minimal.md
-✓ outline.md (selected: notion + dense)
+✓ outline-strategy-a.md
+✓ outline-strategy-b.md
+✓ outline-strategy-c.md
+✓ outline.md (selected: [strategy])
 
 Files:
 - 01-cover-[slug].png ✓ Cover (sparse)
@@ -292,25 +371,11 @@ Files:
 
 ## Image Modification
 
-### Edit Single Image
-
-1. Identify image to edit (e.g., `03-content-chatgpt.png`)
-2. Update prompt in `prompts/03-content-chatgpt.md` if needed
-3. Regenerate image using same session ID
-
-### Add New Image
-
-1. Specify insertion position (e.g., after image 3)
-2. Create new prompt with appropriate slug
-3. Generate new image
-4. **Renumber files**: All subsequent images increment NN by 1
-5. Update `outline.md` with new image entry
-
-### Delete Image
-
-1. Remove image file and prompt file
-2. **Renumber files**: All subsequent images decrement NN by 1
-3. Update `outline.md` to remove image entry
+| Action | Steps |
+|--------|-------|
+| **Edit** | Update prompt → Regenerate with same session ID |
+| **Add** | Specify position → Create prompt → Generate → Renumber subsequent files (NN+1) → Update outline |
+| **Delete** | Remove files → Renumber subsequent (NN-1) → Update outline |
 
 ## Content Breakdown Principles
 
@@ -334,39 +399,39 @@ Files:
 
 ## References
 
-Detailed templates and guidelines in `references/` directory:
-- `analysis-framework.md` - XHS-specific content analysis
-- `outline-template.md` - Outline format and examples
-- `styles/<style>.md` - Detailed style definitions
-- `layouts/<layout>.md` - Detailed layout definitions
-- `base-prompt.md` - Base prompt template
-- `preferences-schema.md` - EXTEND.md YAML schema
-- `watermark-guide.md` - Watermark configuration guide
-- `first-time-setup.md` - First-time setup flow
+Detailed templates in `references/` directory:
+
+**Elements** (Visual building blocks):
+- `elements/canvas.md` - Aspect ratios, safe zones, grid layouts
+- `elements/image-effects.md` - Cutout, stroke, filters
+- `elements/typography.md` - Decorated text (花字), tags, text direction
+- `elements/decorations.md` - Emphasis marks, backgrounds, doodles, frames
+
+**Presets** (Style presets):
+- `presets/<name>.md` - Element combination definitions (cute, notion, warm...)
+
+**Workflows** (Process guides):
+- `workflows/analysis-framework.md` - Content analysis framework
+- `workflows/outline-template.md` - Outline template with layout guide
+- `workflows/prompt-assembly.md` - Prompt assembly guide
+
+**Config** (Settings):
+- `config/preferences-schema.md` - EXTEND.md schema
+- `config/first-time-setup.md` - First-time setup flow
+- `config/watermark-guide.md` - Watermark configuration
 
 ## Notes
 
-- Image generation typically takes 10-30 seconds per image
-- Auto-retry once on generation failure
-- Use cartoon alternatives for sensitive public figures
-- All prompts and text use confirmed language preference
-- Maintain style consistency across all images in series
+- Auto-retry once on failure | Cartoon alternatives for sensitive figures
+- Use confirmed language preference | Maintain style consistency
+- **Two confirmation points required** (Steps 2 & 4) - do not skip
 
 ## Extension Support
 
-Custom styles and configurations via EXTEND.md.
+Custom configurations via EXTEND.md. Loaded in Step 0, overrides defaults.
 
-**Check paths** (priority order):
-1. `.baoyu-skills/baoyu-xhs-images/EXTEND.md` (project)
-2. `~/.baoyu-skills/baoyu-xhs-images/EXTEND.md` (user)
+**Check paths** (priority): `.baoyu-skills/baoyu-xhs-images/EXTEND.md` (project) → `~/.baoyu-skills/baoyu-xhs-images/EXTEND.md` (user)
 
-If found, load in Step 0. Extension content overrides defaults.
+**Supports**: Watermark | Preferred style/layout | Custom style definitions
 
-**Supported preferences**:
-- Watermark settings (content, position, opacity)
-- Preferred style with custom description
-- Preferred layout
-- Custom style definitions
-
-**Schema**: `references/preferences-schema.md`
-**First-time setup**: `references/first-time-setup.md`
+**References**: `config/preferences-schema.md` | `config/first-time-setup.md`

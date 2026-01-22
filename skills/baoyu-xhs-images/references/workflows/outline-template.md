@@ -1,13 +1,13 @@
 # Xiaohongshu Outline Template
 
-Template for generating infographic series outlines.
+Template for generating infographic series outlines with layout specifications.
 
 ## File Naming
 
-Outline files use style slug in the name:
-- `outline-style-notion.md` - Notion style variant
-- `outline-style-chalkboard.md` - Chalkboard style variant
-- `outline-style-minimal.md` - Minimal style variant
+Outline files use strategy identifier in the name:
+- `outline-strategy-a.md` - Story-driven variant
+- `outline-strategy-b.md` - Information-dense variant
+- `outline-strategy-c.md` - Visual-first variant
 - `outline.md` - Final selected (copied from chosen variant)
 
 ## Image File Naming
@@ -37,12 +37,42 @@ NN-{type}-[slug].md (in prompts/)
 - Must be unique within the series
 - Keep short but descriptive (2-4 words)
 
+## Layout Selection Guide
+
+### Density-Based Layouts
+
+| Layout | When to Use | Info Points | Whitespace |
+|--------|-------------|-------------|------------|
+| sparse | Covers, quotes, impact statements | 1-2 | 60-70% |
+| balanced | Standard content, tutorials | 3-4 | 40-50% |
+| dense | Knowledge cards, cheat sheets | 5-8 | 20-30% |
+
+### Structure-Based Layouts
+
+| Layout | When to Use | Structure |
+|--------|-------------|-----------|
+| list | Rankings, checklists, steps | Numbered/bulleted vertical |
+| comparison | Before/after, pros/cons | Left vs right split |
+| flow | Processes, timelines | Connected nodes with arrows |
+
+### Position-Based Recommendations
+
+| Position | Recommended | Reasoning |
+|----------|-------------|-----------|
+| Cover | sparse | Maximum impact, clear title |
+| Setup | balanced | Context without overwhelming |
+| Core | balanced/dense/list | Match content density |
+| Payoff | balanced/list | Clear takeaways |
+| Ending | sparse | Clean CTA, memorable |
+
 ## Outline Format
 
 ```markdown
 # Xiaohongshu Infographic Series Outline
 
 ---
+strategy: a  # a, b, or c
+name: Story-Driven
 style: notion
 default_layout: dense
 image_count: 6
@@ -188,16 +218,6 @@ Notion界面风格，简洁黑白配色
 ---
 ```
 
-## Layout Guidelines by Position
-
-| Position | Recommended Layout | Why |
-|----------|-------------------|-----|
-| Cover | `sparse` | Maximum visual impact, clear title |
-| Setup | `balanced` | Context without overwhelming |
-| Core | `balanced`/`dense`/`list` | Based on content density |
-| Payoff | `balanced`/`list` | Clear takeaways |
-| Ending | `sparse` | Clean CTA, memorable close |
-
 ## Swipe Hook Strategies
 
 Each image should end with a hook for the next:
@@ -211,18 +231,17 @@ Each image should end with a hook for the next:
 | Promise | "最后一个最实用👇" |
 | Urgency | "最重要的来了👇" |
 
-## Variant Differentiation
+## Strategy Differentiation
 
-Three variants should differ meaningfully:
+Three strategies should differ meaningfully:
 
-| Aspect | Variant A | Variant B | Variant C |
-|--------|-----------|-----------|-----------|
-| Style | Primary match | Alternative | Different mood |
-| Layout | Content-optimized | Different density | Different structure |
-| Tone | Professional | Casual | Playful |
-| Audience | Primary target | Secondary target | Broader appeal |
+| Strategy | Focus | Structure | Page Count |
+|----------|-------|-----------|------------|
+| A: Story-Driven | Emotional, personal | Hook→Problem→Discovery→Experience→Conclusion | 4-6 |
+| B: Information-Dense | Factual, structured | Core→Info Cards→Comparison→Recommendation | 3-5 |
+| C: Visual-First | Atmospheric, minimal text | Hero→Details→Lifestyle→CTA | 3-4 |
 
 **Example for "AI工具推荐"**:
-- `outline-style-notion.md`: Notion + Dense - 知识卡片风
-- `outline-style-notion.md`: Notion + List - 清爽知识卡片
-- `outline-style-cute.md`: Cute + Balanced - 可爱易读风
+- `outline-strategy-a.md`: Warm + Balanced - Personal journey with AI
+- `outline-strategy-b.md`: Notion + Dense - Knowledge card style
+- `outline-strategy-c.md`: Minimal + Sparse - Sleek tech aesthetic

@@ -2,6 +2,11 @@
 
 English | [中文](./CHANGELOG.zh.md)
 
+## 1.15.1 - 2026-01-22
+
+### Refactor
+- `baoyu-xhs-images`: restructures reference documents into modular architecture—reorganizes scattered files into `config/` (settings), `elements/` (visual building blocks), `presets/` (style definitions), and `workflows/` (process guides) directories for improved maintainability.
+
 ## 1.15.0 - 2026-01-22
 
 ### Features
