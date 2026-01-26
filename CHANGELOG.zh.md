@@ -2,6 +2,16 @@
 
 [English](./CHANGELOG.md) | 中文
 
+## 1.22.0 - 2026-01-25
+
+### 新功能
+- `baoyu-article-illustrator`：新增 `imgs-subdir` 输出目录选项；改进风格选择，始终询问并展示 EXTEND.md 中的 preferred_style。
+- `baoyu-cover-image`：新增 `default_output_dir` 偏好设置，支持 `same-dir`、`imgs-subdir` 和 `independent` 选项，新增 Step 1.5 输出目录选择流程。
+- `baoyu-post-to-wechat`：发布前新增主题选择（default/grace/simple）；新增 HTML 预览步骤；图片占位符简化为 `WECHATIMGPH_N` 格式；重构复制粘贴为跨平台辅助函数。
+
+### 重构
+- `baoyu-post-to-x`：图片占位符从 `[[IMAGE_PLACEHOLDER_N]]` 简化为 `XIMGPH_N` 格式。
+
 ## 1.21.4 - 2026-01-25
 
 ### 修复
