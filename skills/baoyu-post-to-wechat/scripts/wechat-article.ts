@@ -3,7 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { launchChrome, getPageSession, waitForNewTab, clickElement, typeText, evaluate, sleep, type ChromeSession, type CdpConnection } from './cdp.ts';
+import { launchChrome, tryConnectExisting, findExistingChromeDebugPort, getPageSession, waitForNewTab, clickElement, typeText, evaluate, sleep, type ChromeSession, type CdpConnection } from './cdp.ts';
 
 const WECHAT_URL = 'https://mp.weixin.qq.com/';
 
@@ -25,6 +25,7 @@ interface ArticleOptions {
   contentImages?: ImageInfo[];
   submit?: boolean;
   profileDir?: string;
+  cdpPort?: number;
 }
 
 async function waitForLogin(session: ChromeSession, timeoutMs = 120_000): Promise<boolean> {
@@ -33,6 +34,16 @@ async function waitForLogin(session: ChromeSession, timeoutMs = 120_000): Promis
     const url = await evaluate<string>(session, 'window.location.href');
     if (url.includes('/cgi-bin/home')) return true;
     await sleep(2000);
+  }
+  return false;
+}
+
+async function waitForElement(session: ChromeSession, selector: string, timeoutMs = 10_000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const found = await evaluate<boolean>(session, `!!document.querySelector('${selector}')`);
+    if (found) return true;
+    await sleep(500);
   }
   return false;
 }
@@ -234,7 +245,7 @@ async function pressDeleteKey(session: ChromeSession): Promise<void> {
 }
 
 export async function postArticle(options: ArticleOptions): Promise<void> {
-  const { title, content, htmlFile, markdownFile, theme, author, summary, images = [], submit = false, profileDir } = options;
+  const { title, content, htmlFile, markdownFile, theme, author, summary, images = [], submit = false, profileDir, cdpPort } = options;
   let { contentImages = [] } = options;
   let effectiveTitle = title || '';
   let effectiveAuthor = author || '';
@@ -268,22 +279,77 @@ export async function postArticle(options: ArticleOptions): Promise<void> {
   if (effectiveTitle && effectiveTitle.length > 64) throw new Error(`Title too long: ${effectiveTitle.length} chars (max 64)`);
   if (!content && !effectiveHtmlFile) throw new Error('Either --content, --html, or --markdown is required');
 
-  const { cdp, chrome } = await launchChrome(WECHAT_URL, profileDir);
+  let cdp: CdpConnection;
+  let chrome: ReturnType<typeof import('node:child_process').spawn> | null = null;
+
+  // Try connecting to existing Chrome: explicit port > auto-detect > launch new
+  const portToTry = cdpPort ?? await findExistingChromeDebugPort();
+  if (portToTry) {
+    const existing = await tryConnectExisting(portToTry);
+    if (existing) {
+      console.log(`[cdp] Connected to existing Chrome on port ${portToTry}`);
+      cdp = existing;
+    } else {
+      console.log(`[cdp] Port ${portToTry} not available, launching new Chrome...`);
+      const launched = await launchChrome(WECHAT_URL, profileDir);
+      cdp = launched.cdp;
+      chrome = launched.chrome;
+    }
+  } else {
+    const launched = await launchChrome(WECHAT_URL, profileDir);
+    cdp = launched.cdp;
+    chrome = launched.chrome;
+  }
 
   try {
     console.log('[wechat] Waiting for page load...');
     await sleep(3000);
 
-    let session = await getPageSession(cdp, 'mp.weixin.qq.com');
+    let session: ChromeSession;
+    if (!chrome) {
+      // Reusing existing Chrome: find an already-logged-in tab (has token in URL)
+      const allTargets = await cdp.send<{ targetInfos: Array<{ targetId: string; url: string; type: string }> }>('Target.getTargets');
+      const loggedInTab = allTargets.targetInfos.find(t => t.type === 'page' && t.url.includes('mp.weixin.qq.com') && t.url.includes('token='));
+      const wechatTab = loggedInTab || allTargets.targetInfos.find(t => t.type === 'page' && t.url.includes('mp.weixin.qq.com'));
+
+      if (wechatTab) {
+        console.log(`[wechat] Reusing existing tab: ${wechatTab.url.substring(0, 80)}...`);
+        const { sessionId: reuseSid } = await cdp.send<{ sessionId: string }>('Target.attachToTarget', { targetId: wechatTab.targetId, flatten: true });
+        await cdp.send('Page.enable', {}, { sessionId: reuseSid });
+        await cdp.send('Runtime.enable', {}, { sessionId: reuseSid });
+        await cdp.send('DOM.enable', {}, { sessionId: reuseSid });
+        session = { cdp, sessionId: reuseSid, targetId: wechatTab.targetId };
+
+        // Navigate to home if not already there
+        const currentUrl = await evaluate<string>(session, 'window.location.href');
+        if (!currentUrl.includes('/cgi-bin/home')) {
+          console.log('[wechat] Navigating to home...');
+          await evaluate(session, `window.location.href = '${WECHAT_URL}cgi-bin/home?t=home/index'`);
+          await sleep(5000);
+        }
+      } else {
+        // No WeChat tab found, create one
+        console.log('[wechat] No WeChat tab found, opening...');
+        await cdp.send('Target.createTarget', { url: WECHAT_URL });
+        await sleep(5000);
+        session = await getPageSession(cdp, 'mp.weixin.qq.com');
+      }
+    } else {
+      session = await getPageSession(cdp, 'mp.weixin.qq.com');
+    }
 
     const url = await evaluate<string>(session, 'window.location.href');
-    if (!url.includes('/cgi-bin/home')) {
+    if (!url.includes('/cgi-bin/')) {
       console.log('[wechat] Not logged in. Please scan QR code...');
       const loggedIn = await waitForLogin(session);
       if (!loggedIn) throw new Error('Login timeout');
     }
     console.log('[wechat] Logged in.');
     await sleep(2000);
+
+    // Wait for menu to be ready
+    const menuReady = await waitForElement(session, '.new-creation__menu', 20_000);
+    if (!menuReady) throw new Error('Home page menu did not load');
 
     const targets = await cdp.send<{ targetInfos: Array<{ targetId: string; url: string; type: string }> }>('Target.getTargets');
     const initialIds = new Set(targets.targetInfos.map(t => t.targetId));
@@ -413,6 +479,7 @@ Options:
   --image <path>     Content image, can repeat (only with --content)
   --submit           Save as draft
   --profile <dir>    Chrome profile directory
+  --cdp-port <port>  Connect to existing Chrome debug port instead of launching new instance
 
 Examples:
   npx -y bun wechat-article.ts --markdown article.md
@@ -442,6 +509,7 @@ async function main(): Promise<void> {
   let summary: string | undefined;
   let submit = false;
   let profileDir: string | undefined;
+  let cdpPort: number | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
@@ -455,15 +523,18 @@ async function main(): Promise<void> {
     else if (arg === '--image' && args[i + 1]) images.push(args[++i]!);
     else if (arg === '--submit') submit = true;
     else if (arg === '--profile' && args[i + 1]) profileDir = args[++i];
+    else if (arg === '--cdp-port' && args[i + 1]) cdpPort = parseInt(args[++i]!, 10);
   }
 
   if (!markdownFile && !htmlFile && !title) { console.error('Error: --title is required (or use --markdown/--html)'); process.exit(1); }
   if (!markdownFile && !htmlFile && !content) { console.error('Error: --content, --html, or --markdown is required'); process.exit(1); }
 
-  await postArticle({ title: title || '', content, htmlFile, markdownFile, theme, author, summary, images, submit, profileDir });
+  await postArticle({ title: title || '', content, htmlFile, markdownFile, theme, author, summary, images, submit, profileDir, cdpPort });
 }
 
-await main().catch((err) => {
+await main().then(() => {
+  process.exit(0);
+}).catch((err) => {
   console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
 });
