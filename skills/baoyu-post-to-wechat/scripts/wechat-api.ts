@@ -28,6 +28,18 @@ interface PublishResponse {
   errmsg?: string;
 }
 
+type ArticleType = "news" | "newspic";
+
+interface ArticleOptions {
+  title: string;
+  author?: string;
+  digest?: string;
+  content: string;
+  thumbMediaId: string;
+  articleType: ArticleType;
+  imageMediaIds?: string[];
+}
+
 const TOKEN_URL = "https://api.weixin.qq.com/cgi-bin/token";
 const UPLOAD_URL = "https://api.weixin.qq.com/cgi-bin/material/add_material";
 const DRAFT_URL = "https://api.weixin.qq.com/cgi-bin/draft/add";
@@ -176,16 +188,17 @@ async function uploadImagesInHtml(
   html: string,
   accessToken: string,
   baseDir: string
-): Promise<{ html: string; firstMediaId: string }> {
+): Promise<{ html: string; firstMediaId: string; allMediaIds: string[] }> {
   const imgRegex = /<img[^>]*\ssrc=["']([^"']+)["'][^>]*>/gi;
   const matches = [...html.matchAll(imgRegex)];
 
   if (matches.length === 0) {
-    return { html, firstMediaId: "" };
+    return { html, firstMediaId: "", allMediaIds: [] };
   }
 
   let firstMediaId = "";
   let updatedHtml = html;
+  const allMediaIds: string[] = [];
 
   for (const match of matches) {
     const [fullTag, src] = match;
@@ -208,6 +221,7 @@ async function uploadImagesInHtml(
         .replace(/\ssrc=["'][^"']+["']/, ` src="${resp.url}"`)
         .replace(/\sdata-local-path=["'][^"']+["']/, "");
       updatedHtml = updatedHtml.replace(fullTag, newTag);
+      allMediaIds.push(resp.media_id);
       if (!firstMediaId) {
         firstMediaId = resp.media_id;
       }
@@ -216,28 +230,51 @@ async function uploadImagesInHtml(
     }
   }
 
-  return { html: updatedHtml, firstMediaId };
+  return { html: updatedHtml, firstMediaId, allMediaIds };
 }
 
 async function publishToDraft(
-  title: string,
-  html: string,
-  thumbMediaId: string,
+  options: ArticleOptions,
   accessToken: string
 ): Promise<PublishResponse> {
   const url = `${DRAFT_URL}?access_token=${accessToken}`;
+
+  let article: Record<string, unknown>;
+
+  if (options.articleType === "newspic") {
+    if (!options.imageMediaIds || options.imageMediaIds.length === 0) {
+      throw new Error("newspic requires at least one image");
+    }
+    article = {
+      article_type: "newspic",
+      title: options.title,
+      content: options.content,
+      need_open_comment: 1,
+      only_fans_can_comment: 0,
+      image_info: {
+        image_list: options.imageMediaIds.map(id => ({ image_media_id: id })),
+      },
+    };
+    if (options.author) article.author = options.author;
+  } else {
+    article = {
+      article_type: "news",
+      title: options.title,
+      content: options.content,
+      thumb_media_id: options.thumbMediaId,
+      need_open_comment: 1,
+      only_fans_can_comment: 0,
+    };
+    if (options.author) article.author = options.author;
+    if (options.digest) article.digest = options.digest;
+  }
+
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      articles: [{
-        title,
-        content: html,
-        thumb_media_id: thumbMediaId,
-      }],
-    }),
+    body: JSON.stringify({ articles: [article] }),
   });
 
   const data = await res.json() as PublishResponse;
@@ -315,12 +352,23 @@ Arguments:
   file                Markdown (.md) or HTML (.html) file
 
 Options:
+  --type <type>       Article type: news (文章, default) or newspic (图文)
   --title <title>     Override title
-  --summary <text>    Article summary (for future use)
+  --author <name>     Author name (max 16 chars)
+  --summary <text>    Article summary/digest (max 128 chars)
   --theme <name>      Theme name for markdown (default, grace, simple). Default: default
   --cover <path>      Cover image path (local or URL)
   --dry-run           Parse and render only, don't publish
   --help              Show this help
+
+Frontmatter Fields (markdown):
+  title               Article title
+  author              Author name
+  digest/summary      Article summary
+  featureImage/coverImage/cover/image   Cover image path
+
+Comments:
+  Comments are enabled by default, open to all users.
 
 Environment Variables:
   WECHAT_APP_ID       WeChat App ID
@@ -334,7 +382,9 @@ Config File Locations (in priority order):
 Example:
   npx -y bun wechat-api.ts article.md
   npx -y bun wechat-api.ts article.md --theme grace --cover cover.png
+  npx -y bun wechat-api.ts article.md --author "Author Name" --summary "Brief intro"
   npx -y bun wechat-api.ts article.html --title "My Article"
+  npx -y bun wechat-api.ts images/ --type newspic --title "Photo Album"
   npx -y bun wechat-api.ts article.md --dry-run
 `);
   process.exit(0);
@@ -343,7 +393,9 @@ Example:
 interface CliArgs {
   filePath: string;
   isHtml: boolean;
+  articleType: ArticleType;
   title?: string;
+  author?: string;
   summary?: string;
   theme: string;
   cover?: string;
@@ -358,14 +410,22 @@ function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
     filePath: "",
     isHtml: false,
+    articleType: "news",
     theme: "default",
     dryRun: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg === "--title" && argv[i + 1]) {
+    if (arg === "--type" && argv[i + 1]) {
+      const t = argv[++i]!.toLowerCase();
+      if (t === "news" || t === "newspic") {
+        args.articleType = t;
+      }
+    } else if (arg === "--title" && argv[i + 1]) {
       args.title = argv[++i];
+    } else if (arg === "--author" && argv[i + 1]) {
+      args.author = argv[++i];
     } else if (arg === "--summary" && argv[i + 1]) {
       args.summary = argv[++i];
     } else if (arg === "--theme" && argv[i + 1]) {
@@ -410,6 +470,8 @@ async function main(): Promise<void> {
 
   const baseDir = path.dirname(filePath);
   let title = args.title || "";
+  let author = args.author || "";
+  let digest = args.summary || "";
   let htmlPath: string;
   let htmlContent: string;
   let frontmatter: Record<string, string> = {};
@@ -422,9 +484,9 @@ async function main(): Promise<void> {
       const mdContent = fs.readFileSync(mdPath, "utf-8");
       const parsed = parseFrontmatter(mdContent);
       frontmatter = parsed.frontmatter;
-      if (!title && frontmatter.title) {
-        title = frontmatter.title;
-      }
+      if (!title && frontmatter.title) title = frontmatter.title;
+      if (!author) author = frontmatter.author || "";
+      if (!digest) digest = frontmatter.digest || frontmatter.summary || frontmatter.description || "";
     }
     if (!title) {
       title = extractHtmlTitle(fs.readFileSync(htmlPath, "utf-8"));
@@ -441,6 +503,8 @@ async function main(): Promise<void> {
       const h1Match = body.match(/^#\s+(.+)$/m);
       if (h1Match) title = h1Match[1]!;
     }
+    if (!author) author = frontmatter.author || "";
+    if (!digest) digest = frontmatter.digest || frontmatter.summary || frontmatter.description || "";
 
     console.error(`[wechat-api] Theme: ${args.theme}`);
     htmlPath = renderMarkdownToHtml(filePath, args.theme);
@@ -454,10 +518,16 @@ async function main(): Promise<void> {
   }
 
   console.error(`[wechat-api] Title: ${title}`);
+  if (author) console.error(`[wechat-api] Author: ${author}`);
+  if (digest) console.error(`[wechat-api] Digest: ${digest.slice(0, 50)}...`);
+  console.error(`[wechat-api] Type: ${args.articleType}`);
 
   if (args.dryRun) {
     console.log(JSON.stringify({
+      articleType: args.articleType,
       title,
+      author: author || undefined,
+      digest: digest || undefined,
       htmlPath,
       contentLength: htmlContent.length,
     }, null, 2));
@@ -469,7 +539,7 @@ async function main(): Promise<void> {
   const accessToken = await fetchAccessToken(config.appId, config.appSecret);
 
   console.error("[wechat-api] Uploading images...");
-  const { html: processedHtml, firstMediaId } = await uploadImagesInHtml(
+  const { html: processedHtml, firstMediaId, allMediaIds } = await uploadImagesInHtml(
     htmlContent,
     accessToken,
     baseDir
@@ -497,18 +567,32 @@ async function main(): Promise<void> {
     }
   }
 
-  if (!thumbMediaId) {
+  if (args.articleType === "news" && !thumbMediaId) {
     console.error("Error: No cover image. Provide via --cover, frontmatter.featureImage, or include an image in content.");
     process.exit(1);
   }
 
+  if (args.articleType === "newspic" && allMediaIds.length === 0) {
+    console.error("Error: newspic requires at least one image in content.");
+    process.exit(1);
+  }
+
   console.error("[wechat-api] Publishing to draft...");
-  const result = await publishToDraft(title, htmlContent, thumbMediaId, accessToken);
+  const result = await publishToDraft({
+    title,
+    author: author || undefined,
+    digest: digest || undefined,
+    content: htmlContent,
+    thumbMediaId,
+    articleType: args.articleType,
+    imageMediaIds: args.articleType === "newspic" ? allMediaIds : undefined,
+  }, accessToken);
 
   console.log(JSON.stringify({
     success: true,
     media_id: result.media_id,
     title,
+    articleType: args.articleType,
   }, null, 2));
 
   console.error(`[wechat-api] Published successfully! media_id: ${result.media_id}`);
