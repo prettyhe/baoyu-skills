@@ -18,6 +18,7 @@ description: Posts content to WeChat Official Account (微信公众号) via API 
 | `scripts/wechat-browser.ts` | Image-text posts (图文) |
 | `scripts/wechat-article.ts` | Article posting via browser (文章) |
 | `scripts/wechat-api.ts` | Article posting via API (文章) |
+| `scripts/generate-cover.ts` | Generate cover images (封面图生成) - No system dependencies |
 
 ## Preferences (EXTEND.md)
 
@@ -71,9 +72,10 @@ Publishing Progress:
 - [ ] Step 2: Check markdown-to-html skill
 - [ ] Step 3: Convert to HTML
 - [ ] Step 4: Validate metadata (title, summary)
-- [ ] Step 5: Select method and configure credentials
-- [ ] Step 6: Publish to WeChat
-- [ ] Step 7: Report completion
+- [ ] Step 5: Check and prepare cover image
+- [ ] Step 6: Select method and configure credentials
+- [ ] Step 7: Publish to WeChat
+- [ ] Step 8: Report completion
 ```
 
 ### Step 0: Load Preferences
@@ -167,7 +169,120 @@ Check extracted metadata from Step 3 (or HTML meta tags if direct HTML input).
 - **Title**: First H1/H2 heading, or first sentence
 - **Summary**: First paragraph, truncated to 120 characters
 
-### Step 5: Select Publishing Method and Configure
+### Step 5: Check and Prepare Cover Image
+
+**CRITICAL**: WeChat Official Account requires a cover image for article (news) type posts.
+
+**Check for existing cover image sources (in priority order)**:
+
+1. CLI argument: `--cover <path>`
+2. Frontmatter fields: `featureImage`, `coverImage`, `cover`, `image`
+3. First image in HTML content (will be used if found)
+
+**If NO cover image found**, use AskUserQuestion to prompt user with options:
+
+```
+Cover image required for WeChat article posting.
+
+How would you like to provide a cover image?
+```
+
+Options to present:
+
+| Option | Description |
+|--------|-------------|
+| Generate based on article content (Recommended) | Auto-generate a cover image using ImageMagick with article title and theme colors |
+| Provide image path | Specify a local file path or URL to an existing image |
+| Use first image from content | Extract and use the first image found in the article (if available) |
+| Cancel | Stop publishing to add cover image manually |
+
+**If user chooses "Generate based on article content"**:
+
+1. **Check ImageMagick installation**:
+
+```bash
+which convert || which magick
+```
+
+2. **Choose generation method**:
+
+**Method A: ImageMagick (Recommended if installed)**
+
+If ImageMagick IS installed, use it directly:
+
+```bash
+# Extract article title and generate cover
+convert -size 900x500 \
+  -define gradient:angle=135 \
+  gradient:'#667eea'-'#764ba2' \
+  -gravity center \
+  -font "DejaVu-Sans-Bold" \
+  -pointsize 48 \
+  -fill white \
+  -annotate +0-30 '<Article Title Line 1>' \
+  -pointsize 36 \
+  -annotate +0+30 '<Article Title Line 2>' \
+  <output_directory>/<article-basename>-cover.jpg
+```
+
+**Method B: Node.js Script (Fallback - No system dependencies required)**
+
+If ImageMagick is NOT installed, use the npx fallback script:
+
+```bash
+# Generate cover using Node.js (works anywhere, no sudo needed)
+npx -y bun ${SKILL_DIR}/scripts/generate-cover.ts \
+  --title "<Article Title>" \
+  --output <output_directory>/<article-basename>-cover.jpg \
+  --gradient-start "#667eea" \
+  --gradient-end "#764ba2"
+```
+
+**Fallback script features**:
+- ✓ No system dependencies (ImageMagick) required
+- ✓ Works on any platform with Node.js/Bun
+- ✓ No sudo/admin privileges needed
+- ✓ Supports multiple image libraries (tries @napi-rs/canvas → sharp → SVG fallback)
+- ✓ Auto-wraps long titles
+- ✓ Customizable colors and dimensions
+
+**Library installation (optional, for better output)**:
+```bash
+# For PNG/JPEG output (choose one):
+npm install @napi-rs/canvas  # Recommended - native performance
+# OR
+npm install sharp            # Alternative - pure Node.js
+```
+
+If neither library is installed, the script will generate an SVG file (which WeChat API also accepts).
+
+3. Extract article title from HTML/markdown
+4. Generate cover image using the chosen method:
+
+```bash
+# Example: Generate gradient background with title text
+convert -size 900x500 \
+  -define gradient:angle=135 \
+  gradient:'#667eea'-'#764ba2' \
+  -gravity center \
+  -font "DejaVu-Sans-Bold" \
+  -pointsize 48 \
+  -fill white \
+  -annotate +0-30 '<Article Title Line 1>' \
+  -pointsize 36 \
+  -annotate +0+30 '<Article Title Line 2>' \
+  <output_directory>/cover-<slug>.jpg
+```
+
+4. Save to same directory as the article with naming pattern: `<article-basename>-cover.jpg`
+5. Use this generated image as `--cover` parameter
+
+**Image Requirements**:
+- Format: JPEG, PNG, GIF, or WebP
+- Recommended size: 900x500px or 2:1 aspect ratio
+- File size: < 2MB
+
+### Step 6: Select Publishing Method and Configure
 
 **Ask publishing method** (unless specified in EXTEND.md or CLI):
 
@@ -213,8 +328,19 @@ WECHAT_APP_SECRET=<user_input>
 **API method**:
 
 ```bash
-npx -y bun ${SKILL_DIR}/scripts/wechat-api.ts <html_file> [--title <title>] [--summary <summary>]
+npx -y bun ${SKILL_DIR}/scripts/wechat-api.ts <html_file> [--title <title>] [--summary <summary>] [--inline-css]
 ```
+
+**CRITICAL: Style Preservation** (API method):
+
+- **ALWAYS use `--inline-css` for HTML files with styling** (especially those with `<style>` tags)
+- WeChat Official Account does NOT support `<style>` tags or external CSS
+- Without `--inline-css`, all styles will be removed and the article will appear unstyled
+- The `--inline-css` flag converts CSS rules to inline `style="..."` attributes
+- **Recommended command for styled HTML**:
+  ```bash
+  npx -y bun ${SKILL_DIR}/scripts/wechat-api.ts <html_file> --cover <cover_image> --inline-css
+  ```
 
 **Image Handling** (API method):
 
@@ -295,10 +421,14 @@ Files created:
 | Markdown input | Title/content | ✓ (via skill) | ✓ (via skill) |
 | Multiple images | ✓ (up to 9) | ✓ (inline) | ✓ (inline) |
 | Auto-clean image metadata | ✗ | ✓ (AIGC/Coze) | N/A |
+| CSS inline conversion | ✗ | ✓ (--inline-css) | Auto |
+| Auto-generate cover | ✗ | ✓ (2 methods) | ✓ |
+| Cover generation methods | N/A | ImageMagick + Node.js | Manual |
 | Themes | ✗ | ✓ | ✓ |
 | Auto-generate metadata | ✗ | ✓ | ✓ |
 | Requires Chrome | ✓ | ✗ | ✓ |
 | Requires API credentials | ✗ | ✓ | ✗ |
+| Requires system dependencies | ✗ | ✗ (npx fallback) | ✓ |
 | Speed | Medium | Fast | Slow |
 
 ## Prerequisites
@@ -325,7 +455,10 @@ Files created:
 | Issue | Solution |
 |-------|----------|
 | No markdown-to-html skill | Install `baoyu-markdown-to-html` from suggested URL |
-| Missing API credentials | Follow guided setup in Step 5 |
+| Missing API credentials | Follow guided setup in Step 6 |
+| Missing cover image | Use auto-generation (ImageMagick or npx fallback) or provide image path |
+| Cover generation failed | Try npx fallback: `npx -y bun ${SKILL_DIR}/scripts/generate-cover.ts --title "Title" --output cover.jpg` |
+| Styles lost in WeChat | Add `--inline-css` flag to preserve HTML styles |
 | Access token error | Check if API credentials are valid and not expired |
 | Access token error 40164 (invalid ip) | Add current server IP to WeChat Official Account whitelist: mp.weixin.qq.com → 开发 → 基本配置 → IP白名单 |
 | Not logged in (browser) | First run opens browser - scan QR to log in |
