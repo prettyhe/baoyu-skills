@@ -102,10 +102,88 @@ async function fetchAccessToken(appId: string, appSecret: string): Promise<strin
   return data.access_token;
 }
 
-async function uploadImage(
+function cleanImageMetadata(buffer: Buffer): Buffer {
+  // Check if the buffer starts with JPEG signature
+  if (buffer.length < 2 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+    return buffer;
+  }
+  
+  // Check for AIGC or other non-standard metadata in the first 2KB
+  const headerStr = buffer.slice(0, Math.min(2048, buffer.length)).toString('binary');
+  const hasAigcMarker = headerStr.includes('AIGC{') || headerStr.includes('Coze');
+  
+  if (!hasAigcMarker) {
+    return buffer; // No cleaning needed
+  }
+  
+  console.error(`[wechat-api] Detected non-standard metadata, cleaning...`);
+  
+  // Find the first valid JPEG segment marker after SOI (ffd8)
+  let pos = 2;
+  while (pos < buffer.length - 1) {
+    if (buffer[pos] === 0xff) {
+      const marker = buffer[pos + 1];
+      
+      // Skip padding bytes (0x00)
+      if (marker === 0x00) {
+        pos += 2;
+        continue;
+      }
+      
+      // Skip non-standard markers like APP11 (0xeb) which contains AIGC data
+      if (marker === 0xeb || marker === 0xec || marker === 0xed || marker === 0xee || marker === 0xef) {
+        // Read segment length (big-endian)
+        if (pos + 3 < buffer.length) {
+          const length = (buffer[pos + 2] << 8) | buffer[pos + 3];
+          pos += 2 + length;
+          continue;
+        }
+      }
+      
+      // Valid JPEG markers that indicate start of image data
+      // APP0 (0xe0), APP1 (0xe1, EXIF), APP2 (0xe2), DQT (0xdb), SOF0 (0xc0), SOF2 (0xc2)
+      if (marker >= 0xe0 && marker <= 0xe9) {
+        break;
+      }
+      if (marker === 0xdb || marker === 0xc0 || marker === 0xc2 || marker === 0xc4) {
+        break;
+      }
+    }
+    pos++;
+  }
+  
+  // Return cleaned buffer: SOI (ffd8) + from first valid marker
+  const cleaned = Buffer.concat([buffer.slice(0, 2), buffer.slice(pos)]);
+  console.error(`[wechat-api] Cleaned ${buffer.length} -> ${cleaned.length} bytes`);
+  return cleaned;
+}
+
+async function uploadImageWithRetry(
   imagePath: string,
   accessToken: string,
-  baseDir?: string
+  baseDir?: string,
+  retryCount: number = 0
+): Promise<UploadResponse> {
+  try {
+    return await uploadImageInternal(imagePath, accessToken, baseDir, retryCount > 0);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // If it's an unsupported file type error and we haven't retried yet
+    if (errorMsg.includes("40113") && errorMsg.includes("unsupported file type") && retryCount === 0) {
+      console.error(`[wechat-api] Upload failed with unsupported file type, retrying with forced metadata cleaning...`);
+      return await uploadImageInternal(imagePath, accessToken, baseDir, true);
+    }
+    
+    throw error;
+  }
+}
+
+async function uploadImageInternal(
+  imagePath: string,
+  accessToken: string,
+  baseDir?: string,
+  forceClean: boolean = false
 ): Promise<UploadResponse> {
   let fileBuffer: Buffer;
   let filename: string;
@@ -149,6 +227,11 @@ async function uploadImage(
     contentType = mimeTypes[ext] || "image/jpeg";
   }
 
+  // Clean metadata for JPEG images (always clean if forceClean is true)
+  if (forceClean || contentType === "image/jpeg" || filename.toLowerCase().match(/\.(jpg|jpeg)$/)) {
+    fileBuffer = cleanImageMetadata(fileBuffer);
+  }
+
   const boundary = `----WebKitFormBoundary${Date.now().toString(16)}`;
   const header = [
     `--${boundary}`,
@@ -182,6 +265,14 @@ async function uploadImage(
   }
 
   return data;
+}
+
+async function uploadImage(
+  imagePath: string,
+  accessToken: string,
+  baseDir?: string
+): Promise<UploadResponse> {
+  return uploadImageWithRetry(imagePath, accessToken, baseDir, 0);
 }
 
 async function uploadImagesInHtml(
@@ -332,14 +423,172 @@ function renderMarkdownToHtml(markdownPath: string, theme: string = "default"): 
   return htmlPath;
 }
 
-function extractHtmlContent(htmlPath: string): string {
-  const html = fs.readFileSync(htmlPath, "utf-8");
-  const match = html.match(/<div id="output">([\s\S]*?)<\/div>\s*<\/body>/);
-  if (match) {
-    return match[1]!.trim();
+function inlineCss(html: string, css: string): string {
+  // Parse CSS rules
+  const rules: Array<{ selector: string; declarations: Record<string, string> }> = [];
+  const ruleRegex = /([^\{]+)\{([^\}]*)\}/g;
+  let match;
+
+  while ((match = ruleRegex.exec(css)) !== null) {
+    const selectors = match[1]!.split(',').map(s => s.trim());
+    const declarations: Record<string, string> = {};
+    const declText = match[2]!;
+    const declRegex = /([^:]+):\s*([^;]+);?/g;
+    let declMatch;
+
+    while ((declMatch = declRegex.exec(declText)) !== null) {
+      const prop = declMatch[1]!.trim();
+      const value = declMatch[2]!.trim();
+      if (prop && value) {
+        declarations[prop] = value;
+      }
+    }
+
+    for (const selector of selectors) {
+      rules.push({ selector, declarations });
+    }
   }
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  return bodyMatch ? bodyMatch[1]!.trim() : html;
+
+  // Apply styles to elements
+  let result = html;
+
+  // Remove <style> and <link rel="stylesheet"> tags but keep the content
+  result = result.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  result = result.replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, '');
+
+  // Helper function to merge styles into an element tag
+  function mergeStylesIntoTag(tag: string, newStyles: Record<string, string>): string {
+    const styleMatch = tag.match(/style=["']([^"]*)["']/);
+    let existingStyles: Record<string, string> = {};
+
+    if (styleMatch) {
+      // Parse existing styles
+      const styleText = styleMatch[1];
+      const stylePairs = styleText.split(';').filter(s => s.trim());
+      for (const pair of stylePairs) {
+        const colonIdx = pair.indexOf(':');
+        if (colonIdx > 0) {
+          const prop = pair.slice(0, colonIdx).trim();
+          const value = pair.slice(colonIdx + 1).trim();
+          if (prop && value) {
+            existingStyles[prop] = value;
+          }
+        }
+      }
+    }
+
+    // Merge new styles (new styles take precedence)
+    const mergedStyles = { ...existingStyles, ...newStyles };
+    const styleString = Object.entries(mergedStyles)
+      .map(([prop, value]) => `${prop}:${value}`)
+      .join(';');
+
+    if (styleMatch) {
+      // Replace existing style attribute
+      return tag.replace(/style=["'][^"]*["']/, `style="${styleString}"`);
+    } else {
+      // Add new style attribute before the closing >
+      return tag.replace(/>$/, ` style="${styleString}">`);
+    }
+  }
+
+  // Apply inline styles
+  for (const rule of rules) {
+    const selector = rule.selector;
+    const declarations = rule.declarations;
+
+    // Skip universal selector (*) to avoid adding box-sizing to every element
+    // This prevents duplicate style issues
+    if (selector === '*') {
+      continue;
+    }
+
+    // Simple class selector: .class
+    if (selector.startsWith('.')) {
+      const className = selector.slice(1);
+      // Match elements that contain this class name
+      // Use \\b in template string to represent regex word boundary
+      const elementRegex = new RegExp(`<[^>]*\\bclass=["'][^"']*${className}[^"']*["'][^>]*>`, 'gi');
+
+      result = result.replace(elementRegex, (match) => {
+        // Double-check that the class name is actually in the class attribute
+        const classMatch = match.match(/class=["']([^"']*)["']/);
+        if (classMatch && classMatch[1].split(/\s+/).includes(className)) {
+          return mergeStylesIntoTag(match, declarations);
+        }
+        return match;
+      });
+    }
+    // Simple tag selector: tag (exclude html, head, body, meta, link, script, style, title)
+    else if (!selector.includes(' ') && !selector.includes(':') && !selector.includes('[')) {
+      const skipTags = ['html', 'head', 'body', 'meta', 'link', 'script', 'style', 'title', 'DOCTYPE'];
+      if (skipTags.includes(selector.toLowerCase())) {
+        continue;
+      }
+
+      const tagRegex = new RegExp(`<${selector}([^>]*)>`, 'gi');
+
+      result = result.replace(tagRegex, (match, attrs) => {
+        return mergeStylesIntoTag(match, declarations);
+      });
+    }
+  }
+
+  return result;
+}
+
+function cleanHtmlWhitespace(html: string): string {
+  // Remove empty class attributes
+  html = html.replace(/\sclass=""/g, '');
+  
+  // Minimize whitespace between tags while preserving content
+  // This removes indentation spaces that would become &nbsp; in WeChat
+  html = html.replace(/>\s+</g, '><');
+  
+  // Clean up multiple consecutive spaces in text content
+  // but preserve single spaces between words
+  html = html.replace(/(\S)\s{2,}(\S)/g, '$1 $2');
+  
+  // Remove leading/trailing whitespace from the entire content
+  html = html.trim();
+  
+  return html;
+}
+
+function extractHtmlContent(htmlPath: string, shouldInlineCss: boolean = false): string {
+  const html = fs.readFileSync(htmlPath, "utf-8");
+  
+  // Inline CSS if requested
+  let processedHtml = html;
+  if (shouldInlineCss) {
+    // Extract CSS from <style> tags
+    let css = '';
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
+    let styleMatch;
+    while ((styleMatch = styleRegex.exec(html)) !== null) {
+      css += styleMatch[1] + '\n';
+    }
+    
+    if (css.trim()) {
+      console.error("[wechat-api] Inlining CSS styles...");
+      processedHtml = inlineCss(html, css);
+    }
+  }
+  
+  // Extract content from <body> or specific containers
+  let content: string;
+  const outputMatch = processedHtml.match(/<div id="output">([\s\S]*?)<\/div>\s*<\/body>/);
+  if (outputMatch) {
+    content = outputMatch[1]!.trim();
+  } else {
+    const bodyMatch = processedHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    content = bodyMatch ? bodyMatch[1]!.trim() : processedHtml;
+  }
+  
+  // Clean up whitespace to prevent &nbsp; issues in WeChat
+  content = cleanHtmlWhitespace(content);
+  
+  return content;
 }
 
 function printUsage(): never {
@@ -358,6 +607,7 @@ Options:
   --summary <text>    Article summary/digest (max 128 chars)
   --theme <name>      Theme name for markdown (default, grace, simple). Default: default
   --cover <path>      Cover image path (local or URL)
+  --inline-css        Inline CSS styles for HTML input (preserves original styling)
   --dry-run           Parse and render only, don't publish
   --help              Show this help
 
@@ -399,6 +649,7 @@ interface CliArgs {
   summary?: string;
   theme: string;
   cover?: string;
+  inlineCss: boolean;
   dryRun: boolean;
 }
 
@@ -412,6 +663,7 @@ function parseArgs(argv: string[]): CliArgs {
     isHtml: false,
     articleType: "news",
     theme: "default",
+    inlineCss: false,
     dryRun: false,
   };
 
@@ -432,6 +684,8 @@ function parseArgs(argv: string[]): CliArgs {
       args.theme = argv[++i]!;
     } else if (arg === "--cover" && argv[i + 1]) {
       args.cover = argv[++i];
+    } else if (arg === "--inline-css") {
+      args.inlineCss = true;
     } else if (arg === "--dry-run") {
       args.dryRun = true;
     } else if (arg.startsWith("--") && argv[i + 1] && !argv[i + 1]!.startsWith("-")) {
@@ -478,7 +732,7 @@ async function main(): Promise<void> {
 
   if (args.isHtml) {
     htmlPath = filePath;
-    htmlContent = extractHtmlContent(htmlPath);
+    htmlContent = extractHtmlContent(htmlPath, args.inlineCss);
     const mdPath = filePath.replace(/\.html$/i, ".md");
     if (fs.existsSync(mdPath)) {
       const mdContent = fs.readFileSync(mdPath, "utf-8");

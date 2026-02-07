@@ -216,6 +216,13 @@ WECHAT_APP_SECRET=<user_input>
 npx -y bun ${SKILL_DIR}/scripts/wechat-api.ts <html_file> [--title <title>] [--summary <summary>]
 ```
 
+**Image Handling** (API method):
+
+- Automatically downloads remote images (HTTP/HTTPS URLs)
+- **Auto-cleans metadata** for images containing AIGC/Coze markers (e.g., `AIGC{...}`)
+- Retries with forced cleaning if upload fails due to "unsupported file type" errors
+- Supports formats: JPEG, PNG, GIF, WebP
+
 **Browser method**:
 
 ```bash
@@ -287,6 +294,7 @@ Files created:
 | HTML input | ✗ | ✓ | ✓ |
 | Markdown input | Title/content | ✓ (via skill) | ✓ (via skill) |
 | Multiple images | ✓ (up to 9) | ✓ (inline) | ✓ (inline) |
+| Auto-clean image metadata | ✗ | ✓ (AIGC/Coze) | N/A |
 | Themes | ✗ | ✓ | ✓ |
 | Auto-generate metadata | ✗ | ✓ | ✓ |
 | Requires Chrome | ✓ | ✗ | ✓ |
@@ -319,10 +327,12 @@ Files created:
 | No markdown-to-html skill | Install `baoyu-markdown-to-html` from suggested URL |
 | Missing API credentials | Follow guided setup in Step 5 |
 | Access token error | Check if API credentials are valid and not expired |
+| Access token error 40164 (invalid ip) | Add current server IP to WeChat Official Account whitelist: mp.weixin.qq.com → 开发 → 基本配置 → IP白名单 |
 | Not logged in (browser) | First run opens browser - scan QR to log in |
 | Chrome not found | Set `WECHAT_BROWSER_CHROME_PATH` env var |
 | Title/summary missing | Use auto-generation or provide manually |
 | Paste fails | Check system clipboard permissions |
+| Image upload 40113 (unsupported file type) | **Auto-resolved**: Script automatically cleans AIGC/Coze metadata. If persists, manually download and re-save image without metadata. |
 
 ## Extension Support
 
